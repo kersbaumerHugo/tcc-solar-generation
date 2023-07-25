@@ -68,7 +68,7 @@ def import_met_locations(year,recover_data=False,id_estacao="",position=0):
                 else:
                     lat = csv_reader[4][1]
                     long = csv_reader[5][1]
-                    estacao = csv_reader[2][1]
+                    estacao = csv_reader[3][1]
                     #print(estacao,lat,long)
                     #estacao == nome da cidade
                     dic[estacao]=[lat.replace(",","."),long.replace(",",".")]
@@ -92,12 +92,7 @@ for id_city,coord in plant_coords.items():
     for row in station_df.itertuples():
      city_list[id_city].append([row[1],row[2]])
 #print(city_list)
-lista_df = []
-for key in dic.keys():
-    lista_df.append([key,dic[key][0],dic[key][1]])
-df = pd.DataFrame(lista_df,columns=["estacao","Lat","long"])
-df.to_csv("estacoes_lat_long.csv",sep=";")
-print(df)
+
 
 cwd = os.getcwd()
 # list all files in current directory
@@ -106,8 +101,6 @@ file_list = os.listdir(cwd+r'\\climatico\\')
 dic ={}
 total = len(city_list.keys())
 start_time = t.time()
-
-asdasd
 for key in city_list.keys():
     porcentagem = 0
     contador = 0
@@ -150,6 +143,4 @@ for key in city_list.keys():
     #Qual inicio e final da série?
     #Quantos zeros?
     #Quantos N/A nas colunas?
-    #print(df_saida)
-    #print(cwd+r'\\clima_csv\\'+key[:-3].upper()+"_clima.csv")
-    df_saida.to_csv(cwd+r'\\clima_csv\\'+key[:-3].upper()+"_clima.csv")        
+    df_saida.to_csv(cwd+r'clima_csv'+key[:-3].upper()+"_clima.csv")        

@@ -6,18 +6,17 @@ import csv
 import time
 import datetime as dt
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error as mae
-from sklearn.metrics import mean_squared_error as mse
-from sklearn.metrics import r2_score as r2
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import cross_val_score
-def rmse(y_true,y_pred):
-  return mse(y_true,y_pred,squared=False)
 def replace_decimal(val):
     return str(val).replace(',', '.')
+def day_to_date(day_number, year):
+    date_format = '%Y-%m-%d'
+    # create a datetime object for January 1st of the given year
+    start_date = dt.datetime(year, 1, 1)
+    # add the number of days to the start date
+    result_date = start_date + dt.timedelta(days=day_number-2)
+    # format the date string using the specified format
+    #print(result_date)
+    return result_date
 def open_geracao(file_name):
     cwd = os.getcwd()
     geracao_folder = cwd+r'\\geracao_csv\\'
@@ -29,9 +28,24 @@ def open_geracao(file_name):
         csv_reader = csv.reader(f)
         csv_reader = list(csv_reader)
         df_geracao = pd.DataFrame(columns=csv_reader[0],data=csv_reader[1:])
-    df_geracao["Hora"] = df_geracao["Hora"].apply(lambda x: str(float(x) % 24)[:-2]+":00:00")
-    df_geracao["Dia"] = df_geracao["Dia"].apply(lambda x: str(x)[:-9] if len(str(x))>10 else "2021"+str(x)[:-9])
-    df_geracao["Date"] = df_geracao["Dia"]+" "+df_geracao["Hora"]
+        print(file_name)
+    df_geracao["Hora"] = df_geracao["Hora"].apply(lambda x: " "+str(float(x) % 24)[:-2]+":00:00")
+    print(df_geracao["Dia"])
+    #df_geracao["Dia"] = pd.to_datetime(df_geracao["Dia"])
+    df_geracao["Dia"] = df_geracao["Dia"].apply(lambda x: str(day_to_date(int(x),1900)) if len(x)<8 else x)
+    df_geracao["Dia"] = df_geracao["Dia"].apply(lambda x: str(x)[:-9] )#if len(str(x))>10 else "2021"+str(x)[:-9])
+    #df_geracao["Dia"] = pd.to_datetime(df_geracao["Dia"])
+    try:
+        df_geracao["Date"] = pd.to_datetime(df_geracao["Dia"]+df_geracao["Hora"],format="%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        if file_name =="ALEX III":
+            print(df_geracao[df_geracao["Dia"]=="44711"]["Dia"])
+            for dia in df_geracao["Dia"].unique():
+                #if dia > "2022-05-30" and dia < "2022-06-01":
+                    print(dia)
+            asdasd
+            print(df_geracao[df_geracao["Dia"]=="31/05/2022"])
+            df_geracao["Date"] = pd.to_datetime(str(pd.to_datetime(df_geracao["Dia"],origin=""))+df_geracao["Hora"],format="%Y-%m-%d %H:%M:%S")
     df_geracao.drop(columns=["Dia","Hora"])
     df_geracao["Date"] = pd.to_datetime(df_geracao["Date"])
     df_geracao.set_index("Date",inplace=True)
@@ -64,6 +78,7 @@ def open_geracao(file_name):
        'NomFonteCombustivel', 'DatEntradaOperacao', 'MdaPotenciaOutorgadaKw',
        'MdaPotenciaFiscalizadaKw', 'MdaGarantiaFisicaKw', 'DatInicioVigencia', 'DatFimVigencia',
        'DscPropriRegimePariticipacao', 'DscSubBacia', 'DscMuninicpios'])#, '_x', '_y','0','1','2'])
+    
     #dataset_full = dataset_full.fillna(0)
     #print(dataset_full.columns)
     #print(dataset_full)
@@ -95,8 +110,7 @@ def escolhe_estacao(df,num_dias):
     #print(not falha)
     if not falha :
       return estacao
-  return -1
-        
+  return -1     
 def get_all_data_df(estacao_name,df):
   #print(df.columns)
   for column in df.columns:
@@ -111,58 +125,68 @@ def get_all_data_df(estacao_name,df):
     if column[-1:] == "0":
       choice_column_names.append(column[:-1])
   escolhida = escolhe_estacao(df_por_dia,num_dias)
-  if escolhida != -1:
-    removed = [0,1,2]
-    for estacao in removed:
-      for column in choice_column_names:
-        if str(estacao) == escolhida:
-          df_por_dia.rename(columns={column+escolhida:column},inplace=True)
-        else:
-          df_por_dia.drop(columns=[column+str(estacao)],inplace=True)
-    #print(df_por_dia.columns)
-    #print(escolhida)
-    dias_zero_geracao = df_por_dia.isin([0]).sum(axis=0)["Geração no Centro de Gravidade - MW médios (Gp,j) - MWh"]
-    dias_NaN_geracao = df_por_dia.isin([np.NaN]).sum(axis=0)["Geração no Centro de Gravidade - MW médios (Gp,j) - MWh"]
-    dias_zero_radiation = df_por_dia.isin([0]).sum(axis=0)["radiation"]
-    dias_NaN_radiation = df_por_dia.isin([np.NaN]).sum(axis=0)["radiation"]
-    start_date = df_por_dia.index.min()
-    end_date = df_por_dia.index.max()
-    
-    
-    data = [estacao_name,num_dias,dias_zero_geracao,dias_NaN_geracao,start_date,end_date,dias_zero_radiation,dias_NaN_radiation,escolhida]
-    
-    #print(data)
-    return data
-  else:
-    return []
-generate = True
+  print(escolhida)
+  removed = [0,1,2]
+  for estacao in removed:
+    for column in choice_column_names:
+      if str(estacao) == escolhida:
+        df_por_dia.rename(columns={column+escolhida:column},inplace=True)
+        df.rename(columns={column+escolhida:column},inplace=True)
+      else:
+        df_por_dia.drop(columns=[column+str(estacao)],inplace=True)
+        df.drop(columns=[column+str(estacao)],inplace=True)
+  ##print(df_por_dia.columns)
+  #print(escolhida)
+  lat = df["NumCoordNEmpreendimento"][0]
+  long = df["NumCoordEEmpreendimento"][0]
+  print(lat)
+  print(long)
+  dias_zero_geracao = df_por_dia.isin([0]).sum(axis=0)["Geração no Centro de Gravidade - MW médios (Gp,j) - MWh"]
+  dias_NaN_geracao = df_por_dia.isin([np.NaN]).sum(axis=0)["Geração no Centro de Gravidade - MW médios (Gp,j) - MWh"]
+  dias_zero_radiation = df_por_dia.isin([0]).sum(axis=0)["radiation"]
+  dias_NaN_radiation = df_por_dia.isin([np.NaN]).sum(axis=0)["radiation"]
+  start_date = df_por_dia.index.min()
+  end_date = df_por_dia.index.max()
+  to_remove = ["UMIDADE REL. MAX. NA HORA ANT. (AUT) (%)","UMIDADE REL. MIN. NA HORA ANT. (AUT) (%)","VENTO, DIREÇÃO HORARIA (gr) (° (gr))","VENTO, RAJADA MAXIMA (m/s)",
+             "PRESSÃO ATMOSFERICA MAX.NA HORA ANT. (AUT) (mB)","PRESSÃO ATMOSFERICA MIN. NA HORA ANT. (AUT) (mB)","TEMPERATURA MÁXIMA NA HORA ANT. (AUT) (°C)",
+             "TEMPERATURA MÍNIMA NA HORA ANT. (AUT) (°C)","TEMPERATURA ORVALHO MAX. NA HORA ANT. (AUT) (°C)","TEMPERATURA ORVALHO MIN. NA HORA ANT. (AUT) (°C)",
+             "UMIDADE REL. MAX. NA HORA ANT. (AUT) (%)","UMIDADE REL. MIN. NA HORA ANT. (AUT) (%)","Sigla da Usina","Hora","Dia","IdcGeracaoQualificada"]
+  df = df.drop(to_remove,axis=1)
+  
+  data = [estacao_name,num_dias,dias_zero_geracao,dias_NaN_geracao,start_date,end_date,dias_zero_radiation,dias_NaN_radiation,escolhida,lat,long]
+  
+  
+  return data,df
+gerar_dados = True
 cwd = os.getcwd()
-if generate:
+if gerar_dados:
   file_list = os.listdir(cwd+r'\\geracao_csv')
   all_geracao = []
   coords = {}
-  header = ["Usina","Total de dias","Dias com Geração == 0","Dias com Geração NaN","Start Date","End Date","Dias radiação == 0","Dias radiação NaN","Estação escolhida"]
+  header = ["Usina","Total de dias","Dias com Geração == 0","Dias com Geração NaN","Start Date","End Date","Dias radiação == 0","Dias radiação NaN","Estação escolhida","Latitude","Longitude"]
   data=[]
   for file in file_list:
       if "geracao.csv" in file:
         estacao_name = file[:-12]
         dataset_full = open_geracao(estacao_name)
         #print(dataset_full)
-        dados = get_all_data_df(estacao_name,dataset_full)
+        dados,dataset_full = get_all_data_df(estacao_name,dataset_full)
         if dados == []:
           print("Dataset "+estacao_name+" ignorado devido a excesso de dados faltantes")
         else:
           data.append(dados)
           dataset_full.to_csv(cwd+r'\\full\\'+estacao_name+"_full.csv")
   df_info_geral = pd.DataFrame(data,columns=header)
-  df_info_geral.sort_values(["Total de dias","Dias com Geração == 0"],ascending=[False,True])
+  df_info_geral.sort_values(["Total de dias","Dias com Geração == 0","Dias radiação == 0"],ascending=[False,True,False])
+  df_info_geral.to_csv(cwd+r'\\info_geral.csv')
   print(df_info_geral)
 else:
-  file_list = os.listdir(cwd+r'\\full')
-  for filename in file_list:
-    file_full = cwd+r'\\full\\'+filename+"_full.csv"
-    with open(file_full, 'r',encoding="utf-8") as f:
-          # Create a CSV reader object
-          csv_reader = csv.reader(f)
-          csv_reader = list(csv_reader)
-          df_geracao = pd.DataFrame(columns=csv_reader[0],data=csv_reader[1:])
+  file_info_geral = cwd+r'\\info_geral.csv'
+  with open(file_info_geral, 'r') as f:
+        # Create a CSV reader object
+        csv_reader = csv.reader(f,delimiter=';')
+        csv_reader = list(csv_reader)
+        df_info_geral = pd.DataFrame(columns=csv_reader[0],data=csv_reader[1:])
+  df_info_geral = df_info_geral.drop(columns=["Column1"])
+  df_info_geral = df_info_geral.sort_values(["Total de dias","Dias com Geração == 0","Dias radiação == 0"],ascending=[False,True,False])
+  print(df_info_geral)

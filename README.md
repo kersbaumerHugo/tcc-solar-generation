@@ -12,3 +12,11 @@ Next you are able to run `modelo_final.py` that will create the models and train
 
 Then you can run `mapa.py` that will generate the maps from the work. 
 
+## 🔄 Ongoing Refactoring Process
+This project is being transformed from an academic TCC into 
+production-ready code following software engineering best practices:
+- [x] Modular architecture (separation of concerns)
+- [x] Centralized configuration management
+- [x] Proper logging system
+- [ ] Comprehensive test coverage (in progress)
+- [ ] CI/CD pipeline (planned)

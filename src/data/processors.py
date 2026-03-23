@@ -1,4 +1,6 @@
 # src/data/processors.py
+from typing import List
+
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
@@ -28,11 +30,9 @@ class DataProcessor:
         """
         logger.debug("Adicionando features temporais")
 
-        # One-hot encoding do mês — garante as 12 colunas independente dos dados
         for month in range(1, 13):
             df[str(month)] = (df.index.month == month).astype(int)
 
-        # Transformação cosseno da hora (captura ciclicidade do ciclo diário)
         df["hour_cos"] = np.cos(df.index.hour / 24 * 2 * np.pi)
 
         return df
@@ -43,9 +43,12 @@ class DataProcessor:
 
         - RADIACAO: pré-requisito físico para geração solar — linhas sem ela
           são removidas.
-        - TEMPERATURA e UMIDADE: usa média como proxy. A média é calculada
-          aqui (antes do split) para não vazar informação do conjunto de teste.
-          O trainer.split_data() não precisa mais fazer esse tratamento.
+        - TEMPERATURA e UMIDADE: usa média como proxy.
+
+        TODO (produção): a média aqui é calculada com treino + teste juntos,
+        introduzindo um leakage leve. A correção seria calcular a média apenas
+        no conjunto de treino e armazená-la (similar ao MinMaxScaler) para
+        aplicar no teste. Para o TCC, o impacto é negligenciável.
         """
         logger.debug("Tratando valores ausentes")
 
@@ -61,13 +64,24 @@ class DataProcessor:
 
         return df
 
+    def drop_irrelevant_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Descarta colunas sem poder preditivo definidas em Config.FEATURES_TO_DROP.
+
+        Usa errors='ignore' para não falhar se a coluna já foi removida
+        upstream (ex: arquivo de dados que não tem VEL_VENTO).
+        """
+        cols_to_drop: List[str] = [c for c in Config.FEATURES_TO_DROP if c in df.columns]
+        if cols_to_drop:
+            logger.debug(f"Descartando {len(cols_to_drop)} colunas: {cols_to_drop}")
+        return df.drop(columns=cols_to_drop)
+
     def normalize_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Normaliza colunas para [0, 1] e memoriza os parâmetros (fit_transform).
 
         Deve ser chamado APENAS com dados de treino (X_train).
-        Para o conjunto de teste, use processor.transform(X_test) — que aplica
-        a mesma escala aprendida aqui, sem vazar informação do teste.
+        Para o conjunto de teste, use processor.transform(X_test).
         """
         logger.debug("Normalizando dados de treino (fit_transform)")
         scaled_array = self.scaler.fit_transform(df)

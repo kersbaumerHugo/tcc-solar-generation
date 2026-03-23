@@ -1,16 +1,18 @@
 # src/utils/logger.py
 import logging
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
+
+from src.config.settings import Config
 
 
 def setup_logger(
     name: str = "solar_generation",
     log_level: str = "INFO",
     log_to_file: bool = True,
-    log_dir: str = "logs",
+    log_dir: Path = Config.LOGS_DIR,
 ) -> logging.Logger:
     """
     Configura e retorna um logger.
@@ -19,7 +21,7 @@ def setup_logger(
         name: Nome do logger (namespace no módulo logging do Python)
         log_level: Nível de logging (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         log_to_file: Se True, salva logs em arquivo com timestamp
-        log_dir: Diretório para os arquivos de log
+        log_dir: Diretório para os arquivos de log (padrão: Config.LOGS_DIR)
     """
     instance = logging.getLogger(name)
     instance.setLevel(getattr(logging, log_level.upper()))
@@ -39,7 +41,7 @@ def setup_logger(
 
     if log_to_file:
         log_path = Path(log_dir)
-        log_path.mkdir(exist_ok=True)
+        log_path.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         file_handler = logging.FileHandler(
             log_path / f"solar_generation_{timestamp}.log",

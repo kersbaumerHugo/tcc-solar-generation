@@ -1,6 +1,6 @@
 from pathlib import Path
 from types import MappingProxyType
-from typing import Dict, Tuple
+from typing import Tuple
 
 
 class Config:
@@ -10,8 +10,12 @@ class Config:
     Classe simples (não dataclass): não precisamos de instâncias, apenas de
     constantes de classe acessíveis via Config.ATRIBUTO.
 
-    Tipos imutáveis (tuple, MappingProxyType) evitam mutação acidental em runtime:
-        Config.FEATURES_TO_DROP.append("X")  # ← TypeError: tuple não suporta append
+    Tipos imutáveis em todos os níveis:
+    - Path: imutável por natureza
+    - str, int, float: imutáveis por natureza
+    - tuple: imutável (no lugar de list)
+    - MappingProxyType: dict imutável em profundidade 1
+      (valores internos são tuples, portanto totalmente imutável)
     """
 
     # -------------------------------------------------------------------------
@@ -24,11 +28,11 @@ class Config:
     FULL_DIR: Path = DATA_DIR / "full"
     RESULTS_DIR: Path = BASE_DIR / "results"
     LOGS_DIR: Path = BASE_DIR / "logs"
+    MODELS_DIR: Path = BASE_DIR / "models"
 
     # -------------------------------------------------------------------------
     # Mapeamento de colunas (fonte única de verdade)
     # Chave: nome original no arquivo bruto → Valor: nome padronizado interno
-    # MappingProxyType torna o dict imutável — nenhum módulo pode sobrescrever
     # -------------------------------------------------------------------------
     COLUMN_MAPPING: MappingProxyType = MappingProxyType(
         {
@@ -50,7 +54,8 @@ class Config:
     # -------------------------------------------------------------------------
     TARGET_COLUMN: str = "GERACAO"
 
-    # tuple (imutável) em vez de list — evita Config.FEATURES_TO_DROP.append(...)
+    # Colunas descartadas antes do treinamento (sem poder preditivo ou redundantes).
+    # Aplicadas em DataProcessor.drop_irrelevant_features().
     FEATURES_TO_DROP: Tuple[str, ...] = (
         "VEL_VENTO",
         "COORD_N",
@@ -63,10 +68,7 @@ class Config:
     # -------------------------------------------------------------------------
     # Thresholds de qualidade de dados
     # -------------------------------------------------------------------------
-    # Colunas com mais de NAN_THRESHOLD de valores ausentes são descartadas
     NAN_THRESHOLD: float = 0.75
-
-    # Datasets com menos amostras que isso são ignorados no treinamento
     MIN_DATASET_SIZE: int = 10_000
 
     # -------------------------------------------------------------------------
@@ -77,17 +79,23 @@ class Config:
 
     # -------------------------------------------------------------------------
     # Grids de hiperparâmetros
-    # random_state é passado diretamente ao estimador, não ao grid
+    # Valores são tuples (imutáveis) — GridSearchCV aceita qualquer iterável.
+    # MappingProxyType impede adição/remoção de chaves.
+    # random_state é passado diretamente ao estimador, não ao grid.
     # -------------------------------------------------------------------------
-    DT_GRID: Dict[str, list] = {
-        "max_features": [1.0],
-        "max_depth": [5, 7, 10, 12, 15, 20],
-        "criterion": ["squared_error"],
-    }
+    DT_GRID: MappingProxyType = MappingProxyType(
+        {
+            "max_features": (1.0,),
+            "max_depth": (5, 7, 10, 12, 15, 20),
+            "criterion": ("squared_error",),
+        }
+    )
 
-    RF_GRID: Dict[str, list] = {
-        "n_estimators": [1, 2, 5, 10, 15, 20],
-        "max_features": [1.0],
-        "max_depth": [5, 7, 10, 12, 15, 20],
-        "criterion": ["squared_error"],
-    }
+    RF_GRID: MappingProxyType = MappingProxyType(
+        {
+            "n_estimators": (1, 2, 5, 10, 15, 20),
+            "max_features": (1.0,),
+            "max_depth": (5, 7, 10, 12, 15, 20),
+            "criterion": ("squared_error",),
+        }
+    )

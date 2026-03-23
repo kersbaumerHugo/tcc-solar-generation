@@ -101,6 +101,49 @@ class TestHandleMissingValues:
         assert len(result) == original_len
 
 
+class TestDropIrrelevantFeatures:
+    def test_drops_configured_columns(self):
+        """Deve remover todas as colunas em Config.FEATURES_TO_DROP."""
+        from src.config.settings import Config
+
+        index = pd.date_range("2023-01-01", periods=5, freq="h")
+        df = pd.DataFrame(
+            {
+                "GERACAO": [1.0] * 5,
+                "RADIACAO": [500.0] * 5,
+                "VEL_VENTO": [3.0] * 5,
+                "COORD_N": [0.0] * 5,
+            },
+            index=index,
+        )
+        processor = DataProcessor()
+        result = processor.drop_irrelevant_features(df)
+
+        for col in Config.FEATURES_TO_DROP:
+            assert col not in result.columns, f"'{col}' deveria ter sido removida"
+
+    def test_preserves_target_and_feature_columns(self):
+        index = pd.date_range("2023-01-01", periods=5, freq="h")
+        df = pd.DataFrame(
+            {"GERACAO": [1.0] * 5, "RADIACAO": [500.0] * 5, "VEL_VENTO": [3.0] * 5},
+            index=index,
+        )
+        processor = DataProcessor()
+        result = processor.drop_irrelevant_features(df)
+
+        assert "GERACAO" in result.columns
+        assert "RADIACAO" in result.columns
+
+    def test_does_not_fail_if_column_absent(self):
+        """errors='ignore': não falha se uma coluna de FEATURES_TO_DROP não existir."""
+        index = pd.date_range("2023-01-01", periods=5, freq="h")
+        df = pd.DataFrame({"GERACAO": [1.0] * 5, "RADIACAO": [500.0] * 5}, index=index)
+        processor = DataProcessor()
+        # Nenhuma coluna de FEATURES_TO_DROP existe aqui — não deve levantar exceção
+        result = processor.drop_irrelevant_features(df)
+        assert list(result.columns) == ["GERACAO", "RADIACAO"]
+
+
 class TestNormalizeData:
     def test_output_range_is_0_to_1(self, sample_df):
         processor = DataProcessor()

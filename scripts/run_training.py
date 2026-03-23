@@ -76,6 +76,10 @@ def main() -> None:
             analyzer.log_report(rf_model, feature_names, "Random Forest")
             registry.save(rf_model, f"{usina_name}_random_forest")
 
+            # Persiste o processor com o scaler já fitado — obrigatório para que
+            # run_evaluation.py aplique a mesma escala usada no treinamento
+            registry.save(processor, f"{usina_name}_processor")
+
             results.append(
                 {
                     "usina": usina_name,

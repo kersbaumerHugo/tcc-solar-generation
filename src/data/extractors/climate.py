@@ -20,11 +20,17 @@ _INMET_DATA_START_ROW = 9
 Coords = Tuple[float, float]  # (latitude, longitude)
 
 
-def _parse_inmet_header(csv_rows: List[List[str]]) -> Dict[str, Coords]:
+def _parse_inmet_header(csv_rows: List[List[str]]) -> Tuple[str, Coords]:
     """
     Extrai id_estacao → (lat, lon) do cabeçalho de um CSV INMET.
 
     O INMET usa separador ';' e os metadados ficam nas primeiras linhas.
+
+    Retorna uma tupla (station_id, (lat, lon)) — não um dict — porque a função
+    sempre lê exatamente uma estação por chamada (um arquivo = uma estação).
+    Dict[str, Coords] implicaria múltiplas entradas; Tuple[str, Coords] comunica
+    a cardinalidade correta e permite unpacking direto no call site:
+        station_id, (lat, lon) = _parse_inmet_header(rows)
     """
     station_id = csv_rows[_INMET_STATION_ID_ROW][1]
     lat = float(csv_rows[_INMET_LAT_ROW][1].replace(",", "."))

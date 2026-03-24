@@ -64,11 +64,17 @@ class ETLPipeline:
         gen_extractor: SolarGenerationExtractor,
         clim_extractor: ClimateDataExtractor,
         output_dir: Path,
+        # geracao_dir recebe os CSVs intermediários por usina (geração bruta
+        # antes do merge). Separado de output_dir (que contém *_full.csv) para
+        # manter rastreabilidade. Injetado aqui para respeitar DIP: o pipeline
+        # não deve conhecer Config diretamente, quem chama decide o path.
+        geracao_dir: Path = Config.GERACAO_DIR,
         nan_threshold: float = Config.NAN_THRESHOLD,
     ) -> None:
         self.gen_extractor = gen_extractor
         self.clim_extractor = clim_extractor
         self.output_dir = output_dir
+        self.geracao_dir = geracao_dir
         self.nan_threshold = nan_threshold
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -99,7 +105,7 @@ class ETLPipeline:
             return pd.DataFrame()
 
         # Salva CSVs intermediários de geração por usina
-        self.gen_extractor.save_per_plant(gen_df, Config.GERACAO_DIR)
+        self.gen_extractor.save_per_plant(gen_df, self.geracao_dir)
 
         summaries = []
         plants = sorted(gen_df["Sigla da Usina"].unique())
@@ -165,10 +171,7 @@ class ETLPipeline:
             logger.warning(f"  {usina}: merge resultou em DataFrame vazio — ignorando")
             return None
 
-        # Limpeza de colunas desnecessárias
-        merged = self._drop_extra_columns(merged)
-
-        # Converte strings para float
+        # Converte strings para float (antes de resample/seleção de estação)
         merged = self._coerce_numeric(merged)
 
         # Seleciona melhor estação
@@ -181,6 +184,14 @@ class ETLPipeline:
             return None
 
         merged = self._keep_best_station(merged, daily, best_station)
+
+        # Limpeza de colunas desnecessárias — executada APÓS _keep_best_station
+        # porque _parse_inmet_data sufixia todas as colunas climáticas com o
+        # índice da estação (ex: "UMIDADE...0"). Se _drop_extra_columns fosse
+        # chamado antes, os nomes em _CLIMATE_COLS_TO_DROP (sem sufixo) nunca
+        # casariam e nenhuma coluna seria removida. Depois do keep, os sufixos
+        # já foram retirados e os nomes batem com o tuple de drop.
+        merged = self._drop_extra_columns(merged)
 
         # Salva
         out_path = self.output_dir / f"{usina}_full.csv"

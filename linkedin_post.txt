@@ -1,0 +1,54 @@
+🔋 De código de TCC para produção — o que aprendi refatorando com IA
+
+Acabei de concluir a primeira rodada de refatoração do meu TCC de Engenharia Mecânica (UFRJ) sobre previsão de geração solar fotovoltaica com Machine Learning.
+
+O código original funcionava — mas era o que os devs chamam de "código acadêmico": monolítico, com paths hardcoded para Windows, magic numbers espalhados, sem nenhum teste, e com um bug de data leakage que tornava as métricas do modelo artificialmente otimistas.
+
+Usei o Claude Code como mentor sênior de arquitetura ao longo do processo. O resultado em números:
+
+📊 0 → 71 testes unitários
+🐛 1 bug crítico de ML corrigido (data leakage no MinMaxScaler)
+🏗️ 6 módulos refatorados com princípios SOLID
+📦 ModelRegistry com joblib para persistência de modelos
+🔍 FeatureImportanceAnalyzer para interpretabilidade
+
+---
+
+O bug mais interessante que encontramos:
+
+O código original normalizava os dados ANTES de fazer o split treino/teste. Isso significa que o scaler "via" os dados de teste na hora do fit — algo chamado data leakage. As métricas pareciam boas, mas o modelo nunca tinha sido testado de verdade em dados que não conhecia.
+
+A correção foi simples depois de identificada:
+
+❌ Antes:
+df = processor.normalize_data(df)  # scaler aprende com tudo
+X_train, X_test = split(df)
+
+✅ Depois:
+X_train, X_test = split(df)
+X_train = processor.normalize_data(X_train)  # fit só no treino
+X_test = processor.transform(X_test)         # aplica a escala, sem re-fit
+
+E o melhor: o hook de code review automático no git rejeitou o commit antes do merge e apontou exatamente esse problema.
+
+---
+
+Principais lições até aqui:
+
+1. Código que funciona ≠ código correto. O data leakage é um dos erros mais comuns em projetos de ML e raramente aparece em bugs óbvios.
+
+2. Testes não são burocracia — eles pegaram o bug do LabelBinarizer que retornava shape errado quando havia apenas um mês nos dados de treino.
+
+3. A IA como mentor funciona melhor quando você faz as perguntas certas. Em vez de "me dê o código", o fluxo de "refatore + explique + code review" acelera o aprendizado.
+
+4. Single Source of Truth é o princípio mais impactante que implementei. COLUMN_MAPPING estava definido em dois lugares com entradas diferentes — tipo de bug que só aparece em produção.
+
+---
+
+Próximos passos: refatorar o pipeline de ETL legado (dados INMET + geração da ANEEL) para a nova arquitetura com extractors, transformers e pipeline orquestrador.
+
+O projeto usa Decision Trees e Random Forests com dados climáticos do INMET para prever geração horária de usinas fotovoltaicas no Brasil.
+
+Código aberto, em evolução constante.
+
+#EngenhariaDeSoftware #MachineLearning #Python #SolarEnergy #UFRJ #CleanCode #DataScience #Refactoring #IA

@@ -30,6 +30,20 @@ class Config:
     LOGS_DIR: Path = BASE_DIR / "logs"
     MODELS_DIR: Path = BASE_DIR / "models"
 
+    # Dados brutos (input do ETL)
+    RAW_GERACAO_DIR: Path = DATA_DIR / "raw" / "geracao"
+    RAW_CLIMA_DIR: Path = DATA_DIR / "raw" / "climatico"
+
+    # -------------------------------------------------------------------------
+    # Parâmetros de extração (ETL)
+    # -------------------------------------------------------------------------
+    # Arquivo Excel de geração: planilha 8 (base 0), header na linha 14 (base 0)
+    EXCEL_SHEET_INDEX: int = 8
+    EXCEL_HEADER_ROW: int = 14
+
+    # Número de estações meteorológicas mais próximas a usar por usina
+    NUM_NEAREST_STATIONS: int = 3
+
     # -------------------------------------------------------------------------
     # Mapeamento de colunas (fonte única de verdade)
     # Chave: nome original no arquivo bruto → Valor: nome padronizado interno

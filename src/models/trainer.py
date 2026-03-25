@@ -1,24 +1,41 @@
 # src/models/trainer.py
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import GridSearchCV, TimeSeriesSplit, train_test_split
-from sklearn.tree import DecisionTreeRegressor
+from sklearn.base import BaseEstimator
+from sklearn.model_selection import TimeSeriesSplit, train_test_split
 
 from src.config.settings import Config
+from src.models.base import ModelStrategy
 from src.utils.logger import logger
 
 
 class ModelTrainer:
-    """Responsável pelo treinamento de modelos de ML."""
+    """
+    Orquestra split temporal e treinamento via estratégias plugáveis.
+
+    Por que Strategy aqui?
+    A versão anterior tinha train_decision_tree() e train_random_forest()
+    como dois métodos quase idênticos. Com ModelStrategy, ModelTrainer não
+    precisa saber qual algoritmo está sendo treinado — recebe uma lista de
+    estratégias e delega o treinamento a cada uma. Adicionar GradientBoosting,
+    por exemplo, não requer nenhuma alteração nesta classe (OCP).
+
+    Uso:
+        trainer = ModelTrainer(strategies=[DecisionTreeStrategy(), RandomForestStrategy()])
+        X_train, X_test, y_train, y_test = trainer.split_data(df)
+        results = trainer.train_all(X_train, y_train)
+        # results: {"Decision Tree": (model, cv_results), "Random Forest": (...)}
+    """
 
     def __init__(
         self,
+        strategies: List[ModelStrategy] = (),
         test_size: float = Config.TEST_SIZE,
         random_state: int = Config.RANDOM_STATE,
         min_samples: int = Config.MIN_DATASET_SIZE,
     ) -> None:
+        self.strategies = list(strategies)
         self.test_size = test_size
         self.random_state = random_state
         self.min_samples = min_samples
@@ -32,7 +49,9 @@ class ModelTrainer:
         """
         Divide dados em treino/teste preservando ordem temporal.
 
-        shuffle=False é obrigatório em séries temporais para evitar data leakage.
+        shuffle=False é obrigatório em séries temporais para evitar data
+        leakage — embaralhar quebraria a ordem cronológica e permitiria que
+        dados futuros "vazassem" para o conjunto de treino.
 
         Returns:
             X_train, X_test, y_train, y_test
@@ -50,66 +69,24 @@ class ModelTrainer:
 
         return X_train, X_test, y_train, y_test
 
-    def train_decision_tree(
+    def train_all(
         self,
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        grid_params: Optional[Dict] = None,
-    ) -> Tuple[DecisionTreeRegressor, Dict]:
+    ) -> Dict[str, Tuple[BaseEstimator, Dict]]:
         """
-        Treina Decision Tree com GridSearchCV.
+        Treina todas as estratégias registradas e retorna os resultados.
 
         Returns:
-            (best_model, cv_results)
+            Dict mapeando strategy.name → (best_estimator, cv_results_)
         """
-        if grid_params is None:
-            grid_params = Config.DT_GRID
+        if not self.strategies:
+            logger.warning("ModelTrainer não tem estratégias registradas.")
+            return {}
 
-        logger.info("Treinando Decision Tree com GridSearchCV...")
+        results = {}
+        for strategy in self.strategies:
+            model, cv_results = strategy.train(X_train, y_train, self.tscv)
+            results[strategy.name] = (model, cv_results)
 
-        dt_cv = GridSearchCV(
-            estimator=DecisionTreeRegressor(random_state=self.random_state),
-            param_grid=grid_params,
-            cv=self.tscv,
-            scoring="r2",
-            return_train_score=True,
-            n_jobs=-1,
-        )
-        dt_cv.fit(X_train, y_train)
-
-        logger.info(f"Melhor score (CV): {dt_cv.best_score_:.4f}")
-        logger.info(f"Melhores parâmetros: {dt_cv.best_params_}")
-
-        return dt_cv.best_estimator_, dt_cv.cv_results_
-
-    def train_random_forest(
-        self,
-        X_train: pd.DataFrame,
-        y_train: pd.Series,
-        grid_params: Optional[Dict] = None,
-    ) -> Tuple[RandomForestRegressor, Dict]:
-        """
-        Treina Random Forest com GridSearchCV.
-
-        Returns:
-            (best_model, cv_results)
-        """
-        if grid_params is None:
-            grid_params = Config.RF_GRID
-
-        logger.info("Treinando Random Forest com GridSearchCV...")
-
-        rf_cv = GridSearchCV(
-            estimator=RandomForestRegressor(random_state=self.random_state),
-            param_grid=grid_params,
-            cv=self.tscv,
-            scoring="r2",
-            return_train_score=True,
-            n_jobs=-1,
-        )
-        rf_cv.fit(X_train, y_train)
-
-        logger.info(f"Melhor score (CV): {rf_cv.best_score_:.4f}")
-        logger.info(f"Melhores parâmetros: {rf_cv.best_params_}")
-
-        return rf_cv.best_estimator_, rf_cv.cv_results_
+        return results

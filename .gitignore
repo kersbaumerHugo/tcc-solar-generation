@@ -18,8 +18,8 @@ data/geracao_csv/
 data/clima_csv/
 data/full/
 
-# Modelos treinados
-models/
+# Modelos treinados (artefatos joblib — não código-fonte)
+/models/
 
 # Logs de execução
 logs/

@@ -16,8 +16,11 @@ import pandas as pd
 from src.config.settings import Config
 from src.data.loaders import FullDatasetLoader
 from src.data.processors import DataProcessor
+from src.data.validators.quality_checks import DataQualityChecker
 from src.features.engineering import FeatureImportanceAnalyzer
+from src.models.decision_tree import DecisionTreeStrategy
 from src.models.evaluator import ModelEvaluator
+from src.models.random_forest import RandomForestStrategy
 from src.models.registry import ModelRegistry
 from src.models.trainer import ModelTrainer
 from src.utils.logger import logger
@@ -34,7 +37,10 @@ def main() -> None:
     datasets = loader.load()
 
     processor = DataProcessor()
-    trainer = ModelTrainer()
+    checker = DataQualityChecker()
+    trainer = ModelTrainer(
+        strategies=[DecisionTreeStrategy(), RandomForestStrategy()]
+    )
     evaluator = ModelEvaluator()
     analyzer = FeatureImportanceAnalyzer()
     registry = ModelRegistry(Config.MODELS_DIR)
@@ -45,6 +51,11 @@ def main() -> None:
         logger.info(f"{'='*60}")
 
         try:
+            # Validação de qualidade antes de qualquer transformação
+            quality = checker.check(df_raw)
+            if not quality.passed:
+                logger.warning(f"Problemas de qualidade em {usina_name}:\n{quality}")
+
             # ETL + feature engineering
             df = processor.rename_columns(df_raw)
             df = processor.add_temporal_features(df)
@@ -64,33 +75,29 @@ def main() -> None:
 
             feature_names = list(X_train.columns)
 
-            # Decision Tree
-            dt_model, _ = trainer.train_decision_tree(X_train, y_train)
-            dt_metrics = evaluator.evaluate(dt_model, X_test, y_test, "Decision Tree")
-            analyzer.log_report(dt_model, feature_names, "Decision Tree")
-            registry.save(dt_model, f"{usina_name}_decision_tree")
+            # Treina todas as estratégias de uma vez
+            trained = trainer.train_all(X_train, y_train)
 
-            # Random Forest
-            rf_model, _ = trainer.train_random_forest(X_train, y_train)
-            rf_metrics = evaluator.evaluate(rf_model, X_test, y_test, "Random Forest")
-            analyzer.log_report(rf_model, feature_names, "Random Forest")
-            registry.save(rf_model, f"{usina_name}_random_forest")
+            for strategy_name, (model, _) in trained.items():
+                metrics = evaluator.evaluate(model, X_test, y_test, strategy_name)
+                analyzer.log_report(model, feature_names, strategy_name)
+                model_key = f"{usina_name}_{strategy_name.lower().replace(' ', '_')}"
+                registry.save(model, model_key)
+
+                results.append(
+                    {
+                        "usina": usina_name,
+                        "modelo": strategy_name,
+                        "n_samples": len(df),
+                        "n_features": len(feature_names),
+                        "r2": metrics["r2"],
+                        "rmse": metrics["rmse"],
+                    }
+                )
 
             # Persiste o processor com o scaler já fitado — obrigatório para que
             # run_evaluation.py aplique a mesma escala usada no treinamento
             registry.save(processor, f"{usina_name}_processor")
-
-            results.append(
-                {
-                    "usina": usina_name,
-                    "n_samples": len(df),
-                    "n_features": len(feature_names),
-                    "dt_r2": dt_metrics["r2"],
-                    "dt_rmse": dt_metrics["rmse"],
-                    "rf_r2": rf_metrics["r2"],
-                    "rf_rmse": rf_metrics["rmse"],
-                }
-            )
 
         except Exception as e:
             logger.error(f"Erro ao processar {usina_name}: {e}", exc_info=True)

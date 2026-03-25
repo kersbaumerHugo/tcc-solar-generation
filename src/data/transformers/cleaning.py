@@ -53,11 +53,16 @@ class DataCleaner(DataTransformer):
         """
         Adiciona features temporais: one-hot por mês + cosseno da hora.
 
+        Usa df.copy() para não mutar o DataFrame original — sem isso, colunas
+        seriam adicionadas in-place no objeto do chamador, quebrando código que
+        passa o df e espera preservá-lo inalterado.
+
         LabelBinarizer foi substituído por atribuição direta porque, quando
         apenas um mês está presente na amostra, LabelBinarizer retorna shape
         (n, 1) em vez de (n, 12), causando erro silencioso em produção.
         """
         logger.debug("Adicionando features temporais")
+        df = df.copy()
         for month in range(1, 13):
             df[str(month)] = (df.index.month == month).astype(int)
         df["hour_cos"] = np.cos(df.index.hour / 24 * 2 * np.pi)

@@ -1,5 +1,5 @@
 # src/features/selection.py
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import pandas as pd
 from sklearn.exceptions import NotFittedError
@@ -48,7 +48,7 @@ class FeatureSelector:
         self.selected_features_: Optional[List[str]] = None
         self._importance_df: Optional[pd.DataFrame] = None
 
-    def fit(self, model, feature_names: List[str]) -> "FeatureSelector":
+    def fit(self, model: Any, feature_names: List[str]) -> "FeatureSelector":
         """
         Aprende quais features manter a partir das importâncias do modelo.
 
@@ -101,8 +101,13 @@ class FeatureSelector:
             logger.warning(f"FeatureSelector: {dropped} feature(s) ausente(s) no DataFrame — ignoradas.")
         return df[cols]
 
-    def fit_transform(self, model, feature_names: List[str], df: pd.DataFrame) -> pd.DataFrame:
-        """Conveniência: fit() + transform() em uma chamada."""
+    def fit_transform(self, model: Any, feature_names: List[str], df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Conveniência: fit() + transform() em uma chamada.
+
+        Atenção: assinatura diferente do padrão sklearn (que usa fit_transform(X, y=None))
+        porque aqui o aprendizado depende de um modelo treinado, não de X diretamente.
+        """
         return self.fit(model, feature_names).transform(df)
 
     @property

@@ -10,6 +10,11 @@ Usar um scaler novo ou re-fitar na avaliação produziria uma escala diferente,
 corrompendo os resultados — o modelo foi treinado em uma escala, mas seria
 avaliado em outra.
 
+Os modelos disponíveis são descobertos automaticamente a partir do registry:
+qualquer artefato com prefixo "{usina}_" e sufixo diferente de "_processor"
+é tratado como modelo treinado. Isso elimina a necessidade de manter um dict
+hardcoded (como MODEL_TYPES) que precisaria ser atualizado a cada novo algoritmo.
+
 Uso:
     python scripts/run_evaluation.py
 """
@@ -29,10 +34,18 @@ from src.models.registry import ModelRegistry
 from src.models.trainer import ModelTrainer
 from src.utils.logger import logger
 
-MODEL_TYPES = {
-    "decision_tree": "dt",
-    "random_forest": "rf",
-}
+
+def _discover_models(usina: str, registry: ModelRegistry) -> list:
+    """
+    Retorna os nomes dos modelos treinados disponíveis para uma usina.
+
+    Filtra todos os artefatos do registry que começam com "{usina}_" e
+    exclui o processor (que é infraestrutura, não um modelo de predição).
+    """
+    return [
+        name for name in registry.list_models()
+        if name.startswith(f"{usina}_") and not name.endswith("_processor")
+    ]
 
 
 def main() -> None:
@@ -74,12 +87,18 @@ def main() -> None:
             )
             continue
 
+        usina_models = _discover_models(usina_name, registry)
+        if not usina_models:
+            logger.warning(f"Nenhum modelo encontrado para {usina_name} — ignorando.")
+            continue
+
+        logger.info(f"Modelos encontrados: {usina_models}")
+
         try:
             # Carrega o processor com o scaler já fitado no treinamento.
-            # NÃO instanciar um novo DataProcessor() aqui: o scaler seria diferente.
+            # NÃO instanciar um novo DataProcessor() aqui — o scaler seria diferente.
             processor: DataProcessor = registry.load(processor_name)
 
-            # Replicar o pipeline de pré-processamento (sem normalize_data, que já foi fitado)
             df = processor.rename_columns(df_raw)
             df = processor.add_temporal_features(df)
             df = processor.handle_missing_values(df)
@@ -96,19 +115,16 @@ def main() -> None:
             feature_names = list(X_test.columns)
             row: dict = {"usina": usina_name, "n_test_samples": len(X_test)}
 
-            for model_type, prefix in MODEL_TYPES.items():
-                model_name = f"{usina_name}_{model_type}"
-
-                if not registry.exists(model_name):
-                    logger.warning(f"Modelo não encontrado: {model_name} — ignorando")
-                    continue
+            for model_name in usina_models:
+                # model_type é o sufixo após "{usina}_" (ex: "decision_tree")
+                model_type = model_name[len(f"{usina_name}_"):]
 
                 model = registry.load(model_name)
                 metrics = evaluator.evaluate(model, X_test, y_test, model_type)
                 analyzer.log_report(model, feature_names, model_type)
 
                 for metric_name, value in metrics.items():
-                    row[f"{prefix}_{metric_name}"] = value
+                    row[f"{model_type}_{metric_name}"] = value
 
             results.append(row)
 

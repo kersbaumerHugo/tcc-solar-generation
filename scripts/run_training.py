@@ -51,10 +51,13 @@ def main() -> None:
         logger.info(f"{'='*60}")
 
         try:
-            # Validação de qualidade antes de qualquer transformação
+            # Validação de qualidade antes de qualquer transformação.
+            # Usinas com dados inválidos são puladas: continuar com dados
+            # fora de faixa física pode treinar modelos silenciosamente errados.
             quality = checker.check(df_raw)
             if not quality.passed:
-                logger.warning(f"Problemas de qualidade em {usina_name}:\n{quality}")
+                logger.warning(f"Pulando {usina_name} — problemas de qualidade:\n{quality}")
+                continue
 
             # ETL + feature engineering
             df = processor.rename_columns(df_raw)

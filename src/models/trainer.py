@@ -30,12 +30,12 @@ class ModelTrainer:
 
     def __init__(
         self,
-        strategies: List[ModelStrategy] = (),
+        strategies: List[ModelStrategy] = None,
         test_size: float = Config.TEST_SIZE,
         random_state: int = Config.RANDOM_STATE,
         min_samples: int = Config.MIN_DATASET_SIZE,
     ) -> None:
-        self.strategies = list(strategies)
+        self.strategies = list(strategies) if strategies is not None else []
         self.test_size = test_size
         self.random_state = random_state
         self.min_samples = min_samples

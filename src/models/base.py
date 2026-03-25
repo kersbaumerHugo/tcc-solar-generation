@@ -4,6 +4,9 @@ from typing import Dict, Tuple
 
 import pandas as pd
 from sklearn.base import BaseEstimator
+from sklearn.model_selection import GridSearchCV
+
+from src.utils.logger import logger
 
 
 class ModelStrategy(ABC):
@@ -58,10 +61,6 @@ class ModelStrategy(ABC):
         Returns:
             (best_estimator, cv_results_)
         """
-        from sklearn.model_selection import GridSearchCV
-
-        from src.utils.logger import logger
-
         logger.info(f"Treinando {self.name} com GridSearchCV...")
 
         cv = GridSearchCV(

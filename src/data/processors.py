@@ -1,99 +1,67 @@
 # src/data/processors.py
-from typing import List
+"""
+Facade de compatibilidade — use DataCleaner e DataNormalizer em código novo.
 
-import numpy as np
+DataProcessor mantém a API original para não quebrar run_training.py durante
+a transição. Internamente delega cada método para as classes especializadas:
+  - DataCleaner  → rename_columns, add_temporal_features,
+                   handle_missing_values, drop_irrelevant_features
+  - DataNormalizer → normalize_data, transform
+"""
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 
-from src.config.settings import Config
-from src.utils.logger import logger
+from src.data.transformers.cleaning import DataCleaner
+from src.data.transformers.normalization import DataNormalizer
 
 
 class DataProcessor:
-    """Processa e prepara dados para modelagem."""
+    """
+    Facade sobre DataCleaner + DataNormalizer.
+
+    Prefira usar as classes especializadas diretamente em código novo:
+
+        cleaner    = DataCleaner()
+        normalizer = DataNormalizer()
+        df_clean   = cleaner.transform(df_raw)
+        X_train    = normalizer.fit_transform(X_train)
+        X_test     = normalizer.transform(X_test)
+    """
 
     def __init__(self) -> None:
-        self.scaler = MinMaxScaler()
+        self._cleaner = DataCleaner()
+        self._normalizer = DataNormalizer()
+
+    # ------------------------------------------------------------------
+    # Limpeza — delega para DataCleaner (etapas individuais preservadas
+    # para compatibilidade com run_training.py que as chama separadamente)
+    # ------------------------------------------------------------------
 
     def rename_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Renomeia colunas usando o mapeamento centralizado em Config."""
-        logger.debug("Renomeando colunas")
-        return df.rename(columns=Config.COLUMN_MAPPING)
+        return DataCleaner._rename_columns(df)
 
     def add_temporal_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Adiciona features temporais (one-hot mês + cosseno hora).
-
-        LabelBinarizer foi substituído por atribuição direta: quando só um mês
-        está presente na amostra, LabelBinarizer retorna shape (n, 1) ao invés
-        de (n, 12), causando erro silencioso em produção.
-        """
-        logger.debug("Adicionando features temporais")
-
-        for month in range(1, 13):
-            df[str(month)] = (df.index.month == month).astype(int)
-
-        df["hour_cos"] = np.cos(df.index.hour / 24 * 2 * np.pi)
-
-        return df
+        return DataCleaner._add_temporal_features(df)
 
     def handle_missing_values(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Trata valores faltantes.
-
-        - RADIACAO: pré-requisito físico para geração solar — linhas sem ela
-          são removidas.
-        - TEMPERATURA e UMIDADE: usa média como proxy.
-
-        TODO (produção): a média aqui é calculada com treino + teste juntos,
-        introduzindo um leakage leve. A correção seria calcular a média apenas
-        no conjunto de treino e armazená-la (similar ao MinMaxScaler) para
-        aplicar no teste. Para o TCC, o impacto é negligenciável.
-        """
-        logger.debug("Tratando valores ausentes")
-
-        df = df.dropna(subset=["RADIACAO"])
-
-        fill_values = {}
-        for col in ("TEMPERATURA", "UMIDADE"):
-            if col in df.columns:
-                fill_values[col] = df[col].mean()
-
-        if fill_values:
-            df = df.fillna(fill_values)
-
-        return df
+        return DataCleaner._handle_missing_values(df)
 
     def drop_irrelevant_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Descarta colunas sem poder preditivo definidas em Config.FEATURES_TO_DROP.
+        return DataCleaner._drop_irrelevant_features(df)
 
-        Usa errors='ignore' para não falhar se a coluna já foi removida
-        upstream (ex: arquivo de dados que não tem VEL_VENTO).
-        """
-        cols_to_drop: List[str] = [c for c in Config.FEATURES_TO_DROP if c in df.columns]
-        if cols_to_drop:
-            logger.debug(f"Descartando {len(cols_to_drop)} colunas: {cols_to_drop}")
-        return df.drop(columns=cols_to_drop)
+    # ------------------------------------------------------------------
+    # Normalização — delega para DataNormalizer
+    # ------------------------------------------------------------------
 
     def normalize_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Normaliza colunas para [0, 1] e memoriza os parâmetros (fit_transform).
-
-        Deve ser chamado APENAS com dados de treino (X_train).
-        Para o conjunto de teste, use processor.transform(X_test).
-        """
-        logger.debug("Normalizando dados de treino (fit_transform)")
-        scaled_array = self.scaler.fit_transform(df)
-        return pd.DataFrame(scaled_array, columns=df.columns, index=df.index)
+        """fit_transform — APENAS para X_train."""
+        return self._normalizer.fit_transform(df)
 
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Aplica a normalização já aprendida (transform apenas, sem fit).
+        """transform — APENAS para X_test, após normalize_data ter sido chamado."""
+        return self._normalizer.transform(df)
 
-        Deve ser chamado com dados de teste (X_test) após normalize_data ter
-        sido chamado com os dados de treino.
-        """
-        logger.debug("Aplicando normalização ao conjunto de teste (transform)")
-        scaled_array = self.scaler.transform(df)
-        return pd.DataFrame(scaled_array, columns=df.columns, index=df.index)
+    @property
+    def scaler(self) -> MinMaxScaler:
+        """Acesso ao scaler para compatibilidade com código que o inspeciona."""
+        return self._normalizer.scaler

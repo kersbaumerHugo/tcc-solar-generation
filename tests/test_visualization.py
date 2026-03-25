@@ -15,24 +15,20 @@ import numpy as np
 import pytest
 from matplotlib.figure import Figure
 
+from src.visualization.geographic import plot_combined, plot_plants, plot_stations
 from src.visualization.performance import (
     plot_feature_importance,
     plot_metrics_comparison,
     plot_prediction_vs_real,
     plot_train_test_split,
 )
+
+
 @pytest.fixture(autouse=True)
 def close_figures():
     """Fecha todas as figuras matplotlib após cada teste para evitar memory leak."""
     yield
     plt.close("all")
-
-
-from src.visualization.geographic import (
-    plot_combined,
-    plot_plants,
-    plot_stations,
-)
 
 
 # ---------------------------------------------------------------------------

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -177,13 +178,17 @@ def plot_train_test_split(
     test_start = X_test.index.min()
     test_end = X_test.index.max()
 
+    # mdates.date2num converte Timestamps para o float interno do matplotlib
+    # (dias desde epoch). Misturar Timestamp (left) com int (width) no barh
+    # produz um eixo sem escala de datas; date2num + xaxis_date() resolve.
     train_days = (train_end - train_start).days
     test_days = (test_end - test_start).days
 
     fig, ax = plt.subplots(figsize=(10, 2))
 
-    ax.barh([0], train_days, left=train_start, color="steelblue", label="Treino")
-    ax.barh([0], test_days, left=test_start, color="darkorange", label="Teste")
+    ax.barh([0], train_days, left=mdates.date2num(train_start), color="steelblue", label="Treino")
+    ax.barh([0], test_days, left=mdates.date2num(test_start), color="darkorange", label="Teste")
+    ax.xaxis_date()
 
     ax.set_yticks([])
     ax.set_xlabel("Data")

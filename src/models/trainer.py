@@ -1,5 +1,5 @@
 # src/models/trainer.py
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -30,7 +30,7 @@ class ModelTrainer:
 
     def __init__(
         self,
-        strategies: List[ModelStrategy] = None,
+        strategies: Optional[List[ModelStrategy]] = None,
         test_size: float = Config.TEST_SIZE,
         random_state: int = Config.RANDOM_STATE,
         min_samples: int = Config.MIN_DATASET_SIZE,

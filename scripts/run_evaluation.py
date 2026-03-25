@@ -35,7 +35,7 @@ from src.models.trainer import ModelTrainer
 from src.utils.logger import logger
 
 
-def _discover_models(usina: str, registry: ModelRegistry) -> list:
+def _discover_models(usina: str, registry: ModelRegistry) -> list[str]:
     """
     Retorna os nomes dos modelos treinados disponíveis para uma usina.
 

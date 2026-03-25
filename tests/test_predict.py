@@ -48,19 +48,6 @@ def fitted_registry(tmp_path, sample_df):
     return registry
 
 
-@pytest.fixture
-def raw_climate_df(sample_df):
-    """
-    DataFrame com nomes de colunas originais (pré-rename) para simular
-    um arquivo CSV de entrada para predict.py.
-    """
-    df = sample_df.copy()
-    # Inverte o rename para simular dados brutos
-    reverse = {"GERACAO": "Geração no Centro de Gravidade - MW médios (Gp,j) - MWh",
-               "RADIACAO": "radiation"}
-    return df.rename(columns=reverse)
-
-
 # ---------------------------------------------------------------------------
 # Testes de predict()
 # ---------------------------------------------------------------------------

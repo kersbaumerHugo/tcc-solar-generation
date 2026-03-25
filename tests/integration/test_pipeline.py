@@ -7,14 +7,9 @@ interface que testes unitários não encontram: coluna com nome errado
 chegando ao modelo, scaler fitado em dados errados, features incompatíveis
 entre treino e predição, etc.
 """
-import sys
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import pytest
-
-sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from scripts.predict import predict
 from src.data.processors import DataProcessor

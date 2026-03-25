@@ -1,13 +1,8 @@
 # tests/test_predict.py
-import sys
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import pytest
 from sklearn.tree import DecisionTreeRegressor
-
-sys.path.append(str(Path(__file__).parent.parent))
 
 from scripts.predict import predict
 from src.data.processors import DataProcessor
